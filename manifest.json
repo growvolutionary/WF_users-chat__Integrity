@@ -1,0 +1,43 @@
+{
+  "algorithm": "sha256",
+  "artifacts": {
+    "users-chat_crypto": {
+      "latest": "v1",
+      "path": "crypto",
+      "versions": [
+        {
+          "file": "crypto/v1.js",
+          "sha256": "908fd2305b252b70460424418dac437fdfb65450336b5963169dbb45d384e8dc",
+          "size": 24466,
+          "version": "v1"
+        }
+      ]
+    },
+    "users-chat_vodozemac": {
+      "latest": "0.1.0",
+      "path": "vodozemac",
+      "versions": [
+        {
+          "file": "vodozemac/0.1.0/vodozemac_bg.js",
+          "sha256": "e061366aee4f476031d7225f755b35cfdac66a6339057f98d6baa1435f8c3411",
+          "size": 44755,
+          "version": "0.1.0"
+        }
+      ]
+    },
+    "users-chat_vodozemac_wasm": {
+      "latest": "0.1.0",
+      "path": "vodozemac",
+      "versions": [
+        {
+          "file": "vodozemac/0.1.0/vodozemac_bg.wasm",
+          "sha256": "5b3a606864bbcfe31f4e91f12e73b659c494f6d13c36cb6e1ec94dce992410fd",
+          "size": 639474,
+          "version": "0.1.0"
+        }
+      ]
+    }
+  },
+  "format": 2,
+  "normalization": "Hashes cover the content as stored in git: in text artifacts CRLF line endings count as LF, binary artifacts (.wasm) are hashed byte for byte."
+}
