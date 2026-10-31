@@ -7,9 +7,7 @@ CHUNK_SIZE = 1024 * 1024
 SCRIPT = re.compile(r"^v(\d+)$")
 RELEASE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 ARTIFACTS = {
-    "users-chat_crypto": ("crypto", None, False),
-    "users-chat_vodozemac": ("vodozemac", "vodozemac_bg.js", False),
-    "users-chat_vodozemac_wasm": ("vodozemac", "vodozemac_bg.wasm", True)
+    "users-chat_crypto": ("crypto", None, False)
 }
 NORMALIZATION = ("Hashes cover the content as stored in git: in text artifacts CRLF line endings count as LF, "
                  "binary artifacts (.wasm) are hashed byte for byte.")

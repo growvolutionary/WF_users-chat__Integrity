@@ -1,4 +1,18 @@
-import * as vodozemac from "../vendor/vodozemac/0.1.0/vodozemac_bg.js"
+/********************************************************************
+ *                                                                  *
+ *    Copyright © 2026 GrowVolution Media, Inh. Pierre Schkoldow    *
+ *                                                                  *
+ *      This script encrypts the conversations of the WebFluid      *
+ *        "users-chat" Additive on your device. To keep your        *
+ *     application transparent and secure, you should not edit      *
+ *    or change its content by yourself. Additionally we highly     *
+ *         recommend to add the "peering" Additive to your          *
+ *    application and to not remove the "users-chat" Additive's     *
+ *                        peering features.                         *
+ *                                                                  *
+ ********************************************************************/
+
+import * as vodozemac from "../../../users/static/vendor/vodozemac/0.1.0/vodozemac_bg.js"
 
 const subtle = globalThis.crypto.subtle
 const encoder = new TextEncoder()
@@ -21,8 +35,13 @@ const ROTATE_MESSAGES = 100
 const ROTATE_AGE = 7 * 24 * 3600 * 1000
 const LIST_TTL = 60000
 const NAME_LENGTH = 64
+const LOADED = Symbol.for("wf.users.vodozemac")
+const QUOTE_LENGTH = 160
+const FILE_NAME_LENGTH = 255
+const THUMB_LENGTH = 16384
+const MEDIA_ID = /^[A-Za-z0-9_-]{22}$/
+const REFERENCE_LENGTH = 512
 
-let ready = null
 
 
 export class ChatError extends Error {
@@ -126,10 +145,49 @@ export function card(value) {
     return first ? { first, last: name(value?.last) } : null
 }
 
+export function quote(value) {
+    if (!Number.isInteger(value?.seq) || value.seq < 1 || typeof value.sender !== "string" || !value.sender) return null
+    const text = typeof value.text === "string" ? value.text.trim().slice(0, QUOTE_LENGTH) : ""
+    return { seq: value.seq, sender: value.sender, text }
+}
+
+export function attachment(value) {
+    if (value?.v !== 1 || value.alg !== "A256GCM" || typeof value.id !== "string" || !MEDIA_ID.test(value.id)
+        || typeof value.key !== "string" || typeof value.iv !== "string" || !Number.isInteger(value.size)
+        || value.size < 0) return null
+    const file = {
+        v: 1, alg: "A256GCM", id: value.id, key: value.key, iv: value.iv, size: value.size,
+        mime: typeof value.mime === "string" && value.mime && value.mime.length <= 128 ? value.mime : "application/octet-stream",
+        name: typeof value.name === "string" && value.name.trim() ? value.name.trim().slice(0, FILE_NAME_LENGTH) : null
+    }
+    if (Number.isInteger(value.w) && value.w > 0) file.w = value.w
+    if (Number.isInteger(value.h) && value.h > 0) file.h = value.h
+    if (typeof value.thumb === "string" && value.thumb.startsWith("data:image/") && value.thumb.length <= THUMB_LENGTH) {
+        file.thumb = value.thumb
+    }
+    return file
+}
+
+export function uploadReference(value) {
+    if (value?.v !== 1 || typeof value.url !== "string" || !value.url || value.url.length > REFERENCE_LENGTH) return null
+    let url
+    try { url = new URL(value.url) } catch { return null }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null
+    const upload = {
+        v: 1, url: url.href,
+        mime: typeof value.mime === "string" && value.mime && value.mime.length <= 128 ? value.mime : "application/octet-stream",
+        name: typeof value.name === "string" && value.name.trim() ? value.name.trim().slice(0, FILE_NAME_LENGTH) : null
+    }
+    if (Number.isInteger(value.size) && value.size >= 0) upload.size = value.size
+    if (Number.isInteger(value.w) && value.w > 0) upload.w = value.w
+    if (Number.isInteger(value.h) && value.h > 0) upload.h = value.h
+    return upload
+}
+
 export function load(wasm) {
-    ready ??= (async () => {
-        const bytes = wasm ?? await fetch(new URL("../vendor/vodozemac/0.1.0/vodozemac_bg.wasm", import.meta.url),
-            { credentials: "same-origin" }).then(response => {
+    globalThis[LOADED] ??= (async () => {
+        const bytes = wasm ?? await fetch(new URL("../../../users/static/vendor/vodozemac/0.1.0/vodozemac_bg.wasm",
+            import.meta.url), { credentials: "same-origin" }).then(response => {
             if (!response.ok) throw new ChatError("CRYPTO_UNAVAILABLE")
             return response.arrayBuffer()
         })
@@ -139,10 +197,10 @@ export function load(wasm) {
         instance.exports.__wbindgen_start()
         return vodozemac
     })().catch(error => {
-        ready = null
+        delete globalThis[LOADED]
         throw error
     })
-    return ready
+    return globalThis[LOADED]
 }
 
 export function idbStore(database = "users-chat", store = "state") {
@@ -410,7 +468,7 @@ export class ChatCrypto {
         await this.save()
     }
 
-    encrypt(room, body, sender) {
+    encrypt(room, body, sender, extra = {}) {
         return this.serial(async () => {
             let out = this.outbound.get(room.id)
             if (!out || out.count >= ROTATE_MESSAGES || Date.now() - out.created > ROTATE_AGE) {
@@ -425,9 +483,16 @@ export class ChatCrypto {
             }
             await this.share(room, out)
             const plain = {
-                t: MESSAGE, v: PROTOCOL, room: room.id, body, ts: Date.now(),
+                t: MESSAGE, v: PROTOCOL, room: room.id, body, ts: Number.isFinite(extra.ts) ? extra.ts : Date.now(),
                 from: { account: this.ctx.account, device: this.device }, card: card(sender)
             }
+            const reply = quote(extra.reply)
+            if (reply) plain.reply = reply
+            if (Number.isInteger(extra.edit) && extra.edit > 0) plain.edit = extra.edit
+            const file = attachment(extra.file)
+            if (file) plain.file = file
+            const upload = uploadReference(extra.upload)
+            if (upload && !file) plain.upload = upload
             const ciphertext = out.session.encrypt(JSON.stringify(plain))
             out.count += 1
             return { device: this.device, session_id: out.session.session_id, ciphertext }
@@ -528,8 +593,18 @@ export class ChatCrypto {
         }
     }
 
+    knows(sessionId) {
+        return this.inbound.has(sessionId)
+    }
+
     open(room, event) {
-        const base = { seq: event.seq, sender: event.sender, created_at: event.created_at }
+        const base = {
+            seq: event.seq, rev: event.rev ?? 0, sender: event.sender ?? null, created_at: event.created_at ?? null,
+            edited_at: event.edited_at ?? null, expires_at: event.expires_at ?? null
+        }
+        if (event.hidden) return { ...base, state: "hidden" }
+        if (event.kind === "notice") return { ...base, state: "notice", notice: event.notice ?? null }
+        if (event.deleted) return { ...base, state: "deleted" }
         const entry = this.inbound.get(event.session_id)
         if (!entry) return { ...base, state: "missing" }
         if (entry.room !== room) return { ...base, state: "invalid" }
@@ -541,19 +616,24 @@ export class ChatCrypto {
         } catch (error) {
             return { ...base, state: String(error?.message ?? error).includes("unknown message index") ? "missing" : "invalid" }
         }
-        if (plain?.t !== MESSAGE || plain.v !== PROTOCOL || plain.room !== room || typeof plain.body !== "string") {
+        if (plain?.t !== MESSAGE || plain.v !== PROTOCOL || plain.room !== room || typeof plain.body !== "string"
+            || ("edit" in plain && plain.edit !== event.seq)) {
             return { ...base, state: "invalid" }
         }
+        const file = event.kind === "attachment" ? attachment(plain.file) : null
+        if (event.kind === "attachment" && file?.id !== event.media) return { ...base, state: "invalid" }
         const verified = entry.sender.account === event.sender && entry.sender.device === event.device
             && plain.from?.account === event.sender && plain.from?.device === event.device
         return {
             ...base, state: verified ? "ok" : "unverified", body: plain.body,
-            ts: Number.isFinite(plain.ts) ? plain.ts : null, card: card(plain.card)
+            ts: Number.isFinite(plain.ts) ? plain.ts : null, card: card(plain.card), reply: quote(plain.reply),
+            file, upload: event.kind === "message" ? uploadReference(plain.upload) : null
         }
     }
 
     async decrypt(room, events) {
-        const unknown = [...new Set(events.map(event => event.session_id).filter(id => !this.inbound.has(id)))]
+        const sealed = events.filter(event => !event.hidden && !event.deleted && event.kind !== "notice")
+        const unknown = [...new Set(sealed.map(event => event.session_id).filter(id => id && !this.inbound.has(id)))]
         await this.restore(room, unknown)
         let results = events.map(event => this.open(room, event))
         const retry = [...new Set(events.filter((event, index) => results[index].state === "missing"
