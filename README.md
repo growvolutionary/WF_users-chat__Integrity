@@ -41,6 +41,16 @@ the files the host actually serves.
    `vodozemac/<x.y.z>/`.
 2. Run `python generate.py` and commit the files together with `manifest.json`.
 
+
+## HTTP and SRI digests
+
+Every version also carries `http` (`sha256`, `sha384`, `sri`, `size`): the exact bytes a host serves and
+a browser checks with Subresource Integrity. `sha256` and `size` above keep their meaning — the content
+with CRLF counted as LF (binary artifacts byte for byte) — and their values did not change. A client
+compares bytes it fetched over HTTP only with `http`, never with the normalised `sha256`.
+`python -m pytest -q tests` checks reproducibility, the separation of both digests, a CRLF copy and a
+flipped byte, and — next to the Additive — the served files against `latest`.
+
 ## What the hashes prove
 
 A matching hash proves that a host serves the bytes published here — nothing more. It does not prove

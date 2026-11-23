@@ -7,6 +7,12 @@
       "versions": [
         {
           "file": "crypto/v1.js",
+          "http": {
+            "sha256": "f42ff615a4fa4300cc9b650b32dbc64d62cef4c4a32d79f6062eead16e2b8e09",
+            "sha384": "de5996a4a3b27e303358c11a6a064e011e33288579031afe7c1cd17ace220f4abf528c30f75698e11d3a7da3b005b31b",
+            "size": 29123,
+            "sri": "sha384-3lmWpKOyfjAzWMEaagZOAR4zKIV5Axr+fBzRes4iD0q/Uoww91aY4R06faOwBbMb"
+          },
           "sha256": "f42ff615a4fa4300cc9b650b32dbc64d62cef4c4a32d79f6062eead16e2b8e09",
           "size": 29123,
           "version": "v1"
@@ -15,5 +21,6 @@
     }
   },
   "format": 2,
+  "http": "http covers the exact bytes a host serves and a browser checks with Subresource Integrity: text artifacts are served with LF line endings, binary artifacts byte for byte. A client compares bytes it fetched over HTTP only with http, never with the normalized sha256.",
   "normalization": "Hashes cover the content as stored in git: in text artifacts CRLF line endings count as LF, binary artifacts (.wasm) are hashed byte for byte."
 }
