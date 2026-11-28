@@ -3,21 +3,22 @@
 This repository holds the version history of the static file the `users-chat` Additive serves for its
 end-to-end encryption in the browser, with its correlating hashes:
 
-| Artifact            | Served at                       | Meaning                              |
-|---------------------|---------------------------------|--------------------------------------|
-| `users-chat_crypto` | `/users-chat/static/js/chat.js` | All browser cryptography of the chat |
+| Artifact            | Served at                 | Meaning                              |
+|---------------------|---------------------------|--------------------------------------|
+| `users-chat_crypto` | `/chat/static/js/chat.js` | All browser cryptography of the chat |
 
 The Olm and Megolm primitives (vodozemac) are not part of this repository: the `users` Additive serves and
 pins them and its own integrity repository covers them. `chat.js` only uses them.
 
 ## Contents
 
-| Path                                  | Meaning                                                                                                                |
-|---------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `crypto/v<N>.js`                      | The published source of every version of `static/js/chat.js`.                                                          |
-| `generate.py`                         | Computes the SHA-256 of every version and writes `manifest.json` (and `<folder>/hashes/`).                             |
-| `manifest.json`                       | The public reference, format 2: per artifact one entry per version (`version`, `file`, `sha256`, `size`) and `latest`. |
-| `.gitattributes`                      | Pins the JavaScript files to LF, so a checkout on any platform hashes to the same value.                             |
+| Path             | Meaning                                                                                                                |
+|------------------|------------------------------------------------------------------------------------------------------------------------|
+| `crypto/v<N>.js` | The published source of every version of `static/js/chat.js`.                                                          |
+| `generate.py`    | Computes the SHA-256 of every version and writes `manifest.json` (and `<folder>/hashes/`).                             |
+| `manifest.json`  | The public reference, format 2: per artifact one entry per version (`version`, `file`, `sha256`, `size`) and `latest`. |
+| `sync.py`        | Maintainer step: copies the served `static/js/chat.js` into the latest open version and runs `generate.py`.            |
+| `.gitattributes` | Pins the JavaScript files to LF, so a checkout on any platform hashes to the same value.                               |
 
 `generate.py` hashes the content as stored in git: in the JavaScript files CRLF line endings count as LF. The output is deterministic and carries no timestamps;
 running it twice produces identical files. The `hashes/` folders are a local by-product and not
@@ -25,7 +26,12 @@ committed, `manifest.json` is.
 
 ```bash
 python generate.py
+python -m pytest -q tests
 ```
+
+With this repository checked out as `integrity/` inside the Additive, `python -I sync.py` copies the
+served script with LF line endings into the latest version and regenerates `manifest.json`. A version
+listed in its `FROZEN` map is never rewritten; a changed script then becomes `v<N+1>.js`.
 
 The `users-chat` Additive clones this repository, runs `generate.py` exactly once per integrity run as
 a subprocess of its own interpreter, recomputes every hash itself and only reports versions whose
